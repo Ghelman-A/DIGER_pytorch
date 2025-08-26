@@ -6,6 +6,8 @@ DIGER (*DI*-stillation of temporal *G*radient data for construction *E*ntity act
 
 By significantly improving per-frame performance, DIGER largely eliminates the need for this post-processing, making it highly effective for real-time monitoring applications.
 
+![Overall framework of the DIGER method](doc/DIGER_framework.png)
+
 ## Key Features & Contributions
 
 The improved performance of DIGER is achieved through three main contributions:
