@@ -1,0 +1,69 @@
+---
+backbone_2d: {
+  model: 'darknet',
+  pretrained: True,         # Only when loading the weights trained on COCO, o.w. loaded with trained YOWO or random
+  load_dir: '/home/DIGER/backbone_weights/yolo.pth',
+  freeze_backbone: False,   # To train the entire network or only the last layers
+}
+
+backbone_3d: {
+  model: 'shuffleNetV2',
+  model_width: 2.0,
+  pretrained: True,         #  Only when loading the weights trained on ImageNet 2012, o.w. loaded with trained YOWO or random
+  load_dir: '/home/DIGER/backbone_weights/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
+  freeze_backbone: False,   # To train the entire network or only the last layers
+}
+
+loss: 'ciou'                   # Possible choices: ['ciou', 'diou', 'smooth_l1']
+nms: 'nms'                     # Possible choices: ['nms', 'batched_nms', 'diou_nms']
+nms_thr_type: 'soft_G'         # possible types: ['hard', 'soft_L', 'soft_G'],  Desc.: [normal NMS, Soft-NMS Linear, Soft-NMS Gaussian]
+
+# If no type is specified, training will be without TG
+tg_cfg: {
+  skip_step: 1,                # This skip step is in addition to the one for RGB, (e.g., 4 * 2 = 8 would be the actual skip step)
+  tg_loss_scale: 1.0,
+
+  type: '',                    # possible choices: ['distill', 'aggregate', 'concat', 'aux_distill']
+  distill_layers: 4,
+  kd_loss: {
+    loss: 'cross_entropy',         # Possible choices: ['l1_loss', 'l2_loss', 'cross_entropy', 'cosine_similarity']
+    temp_3d_tg: 0.03,              # TG is the teacher
+    temp_2d_tg: 0.03,
+    
+    temp_3d_rgb: 0.1,              # RGB is the student!
+    temp_2d_rgb: 0.1,
+  },
+
+  aux_distill: {
+    only_3d: True,
+    
+    aux_3d: {
+      model: 'shuffleNetV2',
+      model_width: 0.25,         # Does apply to all models!
+      pretrained: False,         # Same as 3D backbone
+      freeze_backbone: False,    # Same as 3D backbone
+      load_dir: '/home/DIGER/backbone_weights/kinetics_shufflenetv2_0.25x_RGB_16_best.pth',
+    },
+    
+    aux_2d: {
+      model: 'darknet',
+      pretrained: True,         # Same as 2D backbone
+      freeze_backbone: False,   # Same as 2D backbone
+      load_dir: '/home/DIGER/backbone_weights/yolo.pth',
+    },
+  },
+
+  cl_cfg: {   # Curriculum Learning cfg
+    apply_cl: True,
+
+    _2d: {
+      start_epoch: 7,
+      kd_scale: 1.0,
+    },
+
+    _3d: {
+      start_epoch: 7,
+      kd_scale: 1.0,
+    }
+  }
+}

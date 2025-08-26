@@ -1,0 +1,113 @@
+---
+OBJECT_ACTION_NAMES: {
+  excavator: ['digging', 'loading', 'swinging']
+}
+
+raw_vid_dir: "/path/to/dataset"                   # The directory containing the dataset videos.
+exp_datetime: ""                                  # A string representing the datetime in which the experiment is being run
+
+root_dir: &root "/home/DIGER"
+checkpoint_dir: &checkpoint !join [*root, "model_checkpoints/"]
+ds_list_dir: &ds_list !join [*root, "dataset_lists"]                    # Dataset lists directories
+ds_excel_dir: &xlsx_dir !join [*root, "dataset_excel_info"]             # Saving directory for dataset excel files
+csv_dir: &csv_dir !join [*xlsx_dir, "csv/"]     # The directory to the original dataset csv files used during date preparation
+infer_output_dir: !join [*root, 'inference_output/']
+
+arch_cfg: !join [*root, "cfg/arch_cfg.yaml"]
+
+ds_hdf5_dir: !join [*ds_list, "Excavator_ds.hdf5"]                # Saved hdf5 dataset directory
+ds_hdf5_idx_dir: !join [*ds_list, "Excavator_dset_idx.pkl"]       # Directory of saved indices for the data in the hdf5 dataset
+
+train_ratio: 0.8
+eval_ratio: 0.1
+test_ratio: 0.1
+
+pre_trained_resnet: True
+test_pkl_dir: !join [*ds_list, "test.pkl"]
+predict_pkl_dir: !join [*ds_list, "predict.pkl"]
+
+train_mode: "supervised"
+eps: 1.0e-16
+
+supervised: {
+  checkpoint_dir: !join [*checkpoint, ""],
+  stage: 'train',                                                  # Select from ['train', 'test', 'predict']  
+  train_pkl_dir: !join [*ds_list, "train.pkl"],
+  eval_pkl_dir: !join [*ds_list, "eval.pkl"],
+  clip_len: 16,
+  skip_step: 2,
+
+  monitor: "val_acc",                   # The parameter to monitor for model checkpointing and early stopping
+  mode: "max",                          # min or max mode for the monitored parameter
+  patience: 10,                         # Number of times with no improvement before stopping
+  min_delta: 1.0e-3,                    # minimum change to qualify as an improvement. (abs() <= means no improvement)
+
+  eval_clip_len: 16,                    # clip len for supervised eval and test
+  eval_skip: 2,                         # skip step for supervised eval and test
+}
+
+train_cfg: {
+  gpu: True,
+  gpu_device_ids: [0, 1, 2],            # if [] use all available GPUs (could be 1)
+  train_batch_size: 128,
+  val_batch_size: 256,
+  test_batch_size: 128,
+  epochs: 20,
+  warm_up_epochs: 3,                    # Counting from 0, so 5 in total
+  max_lr: 0.02,                         # Learning rate end of warm-up
+  min_lr: 0.0001,                       # Learning rate start of warm-up
+  gamma: 0.5,                           # Decrease rate of max learning rate by cycle.
+  load_ds_to_mem: False,                 # Loads the entire dataset to memory before training
+}
+
+data_prep: {
+  prep_needed: False,
+  cyclic: True,                                          # Extracting clips in a cyclic manner, otherwise the first frame is repeated as needed.
+  train_csv_dir: !join [*csv_dir, "train.xlsx"],         # The directory of the train information csv file.
+  eval_csv_dir: !join [*csv_dir, "eval.xlsx"],           # Same as above but for eval dataset.
+  test_csv_dir: !join [*csv_dir, "test.xlsx"],           # Same as above but for test dataset.
+  raw_dataset_csv_headers: ["Video_Name", "Video_Dir", "Object_Class", "Activity_Class"],
+  ssl_data_headers: ["Video_Name", "Video_Dir", "Object_Class", "Activity_Class", "Aug_Data"],
+  supervised_data_headers: ["Video_Name", "Video_Dir", "Object_Class", "Activity_Class", "Data", "Label"],
+  fr_width: 1920,                                       # Frame width of the videos in the dataset used mainly for normalizing bbox annotations
+  fr_height: 1080,                                      # Frame height of the videos in the dataset used mainly for normalizing annotations
+  resize_factor: 3,                                     # Resizing factor used to create the h5py file while keeping the aspect ratio
+}
+
+long_vid_prep: {
+  data_prep: False,
+  long_vid_dir: '/home/long_vids/',     # Full dir,
+  output_FPS: 15,
+  fr_width: 1920,
+  fr_height: 1080,
+}
+
+aug_cfg: {
+  crop_area_ratio: !to_tuple [0.3, 1],
+  crop_aspect_ratio: !to_tuple [0.5, 2],
+  resize_size: 224,
+  flip_chance: 0.5,
+  jitter_chance: 0.8,
+  jitter_brightness: 0.3,       # Look into torch video transforms for more info!
+  jitter_contrast: 0.3,         # Look into torch video transforms for more info!
+  jitter_saturation: 0.3,       # Look into torch video transforms for more info!
+  jitter_hue: 0.2,              # Look into torch video transforms for more info!
+  greyscale_chance: 0.2,
+  gaussian_blur_kernel: [3, 3],
+  mean: !to_tuple [0.43216, 0.394666, 0.37645],
+  std: !to_tuple [0.22803, 0.22145, 0.216989],
+}
+
+localization_cfg: {
+  num_anchors: 5,
+  anchor_save_dir: !join [*ds_list, "anchors_5_clusters.txt"],  
+  bbone_w: 7,                           # Backbone output feature map size
+  bbone_h: 7,                           # Backbone output feature map size
+  obj_scale: 5,                         # The loss coefficient for the confidence score of an object output (See YOLOv2)
+  no_obj_scale: 1,                      # The loss coefficient for the confidence score of an non object output (See YOLOv2)
+  obj_thr: 0.6,                         # The threshold used to determine if there is an object in a bbox based on the IoU with GT
+  cls_scale: 1.0,                       # The weight of classification loss compared to localization
+  conf_thr: 0.05,                       # Confidence threshold used during inference that also consider cls probabilities
+  pre_nms_thr: 0.6,                     # Confidence threshold used during inference before post-proc with nms
+  nms_thr: 0.4,                         # Non-maximum suppresion threshold
+}
